@@ -7,6 +7,8 @@ import { createShape, createTextShape, createImageShape } from '../lib/templates
 import { fileToDataURL, imageDims, downloadBlob } from '../lib/utils'
 import { detectLegacyPpt, isSupportedFile } from '../lib/importPptx'
 import { exportPptx } from '../lib/exportPptx'
+import { createNewDeck, refreshIndex } from '../lib/persistence'
+import { toast } from '../lib/toast'
 import type { ShapeBase } from '../types'
 
 interface ToolbarProps {
@@ -29,11 +31,11 @@ export default function Toolbar({ onImportFile }: ToolbarProps) {
   const file = async (f: File | null) => {
     if (!f) return
     if (detectLegacyPpt(f)) {
-      alert('Legacy .ppt files are not supported. Please convert to .pptx first (e.g. open in Google Slides or PowerPoint and "Save as .pptx").')
+      toast('Legacy .ppt files are not supported. Please convert to .pptx first (e.g. open in Google Slides or PowerPoint and "Save as .pptx").', 'error')
       return
     }
     if (!isSupportedFile(f)) {
-      alert('Unsupported file type.')
+      toast('Unsupported file type.', 'error')
       return
     }
     onImportFile(f)
@@ -102,7 +104,7 @@ export default function Toolbar({ onImportFile }: ToolbarProps) {
       downloadBlob(blob, name + '.pptx')
     } catch (e) {
       console.error(e)
-      alert('Export failed: ' + (e as Error).message)
+      toast('Export failed: ' + (e as Error).message, 'error')
     }
   }
 
@@ -120,8 +122,23 @@ export default function Toolbar({ onImportFile }: ToolbarProps) {
           align="left"
           children={(close) => (
             <>
-              <MenuItem icon="" onClick={() => { st.getState().newDeck() }}>
-                New presentation
+              <MenuItem
+                icon=""
+                onClick={() => {
+                  void createNewDeck()
+                  close()
+                }}
+              >
+                New deck
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  void refreshIndex()
+                  st.getState().openModal({ kind: 'openDeck' })
+                  close()
+                }}
+              >
+                Open…
               </MenuItem>
               <MenuItem
                 onClick={() => {
@@ -131,7 +148,7 @@ export default function Toolbar({ onImportFile }: ToolbarProps) {
               >
                 Import .pptx
               </MenuItem>
-              <MenuItem onClick={() => { doExport(); close() }}>Download .pptx</MenuItem>
+              <MenuItem onClick={() => { void doExport(); close() }}>Download .pptx</MenuItem>
               <MenuSeparator />
               <MenuItem disabled onClick={() => {}}>
                 Share
@@ -295,7 +312,7 @@ export default function Toolbar({ onImportFile }: ToolbarProps) {
 
       <div className="toolbar-group">
         <Menu
-          label={`${zoom}%`}
+          label={<span className="mono">{zoom}%</span>}
           align="right"
           children={(close) => (
             <>

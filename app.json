@@ -1,0 +1,17 @@
+{
+  "id": "slides",
+  "name": "Slides",
+  "version": "0.1.0",
+  "description": "Create, edit and present slide decks. Imports and exports PowerPoint (.pptx) files.",
+  "icon": "presentation",
+  "ui": "ui/index.html",
+  "nav": { "label": "Slides" },
+  "tools": [
+    {
+      "name": "list_decks",
+      "description": "List saved slide decks with their storage keys and sizes",
+      "kind": "query",
+      "sql": "SELECT key, length(value) AS size, updated_at FROM kv WHERE key LIKE 'deck.%'"
+    }
+  ]
+}

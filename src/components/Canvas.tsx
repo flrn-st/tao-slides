@@ -60,12 +60,16 @@ export default function Canvas({ containerRef }: CanvasProps) {
       stopContextMenu: true,
       backgroundColor: 'transparent',
     })
-    c.selectionColor = 'rgba(26, 115, 232, 0.14)'
-    c.selectionBorderColor = '#1a73e8'
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#eb6c36'
+    const accentSubtle = getComputedStyle(document.documentElement).getPropertyValue('--accent-subtle').trim() || 'rgba(235, 108, 54, 0.14)'
+    c.selectionColor = accentSubtle
+    c.selectionBorderColor = accent
     c.selectionLineWidth = 1
     canvasRef.current = c
     sharedCanvas = c
-    ;(window as any).__editorCanvas = c
+    if (import.meta.env.DEV) {
+      ;(window as any).__editorCanvas = c
+    }
 
     const syncSelection = () => {
       if (applyingSelection.current) return

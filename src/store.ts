@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { nanoid } from 'nanoid'
 import type {
   Background,
   CurrentFormat,
@@ -12,6 +13,16 @@ import type {
 import { cloneSlide, createDefaultDeck, createSlide, BUILTIN_LAYOUTS } from './lib/templates'
 import { deepClone, uid, clamp } from './lib/utils'
 
+export type SaveState = 'saved' | 'saving' | 'error' | 'local'
+export type EditorModal = { kind: 'slideSize' } | { kind: 'insertImage' } | { kind: 'openDeck' } | null
+
+export interface DeckIndexEntry {
+  id: string
+  title: string
+  slideCount: number
+  updatedAt: number
+}
+
 interface ClipboardEntry {
   shapes: Shape[]
   sourceSlideId: string
@@ -21,13 +32,16 @@ interface ClipboardEntry {
 
 interface EditorState {
   deck: Deck
+  deckId: string
+  saveState: SaveState
+  deckIndex: DeckIndexEntry[]
   selectedSlideId: string | null
   selectedShapeIds: string[]
   zoom: number
   present: boolean
   presentIndex: number
   notesOpen: boolean
-  modal: { kind: 'slideSize' } | { kind: 'insertImage' } | null
+  modal: EditorModal
   currentFormat: CurrentFormat
   showGuides: boolean
   slideNumbering: boolean
@@ -43,10 +57,13 @@ interface EditorState {
   redo: () => void
 
   // --- deck ---
+  hydrateDeck: (id: string, deck: Deck, fileName?: string) => void
   newDeck: () => void
   loadDeck: (deck: Deck, fileName?: string) => void
   setSlideSize: (w: number, h: number) => void
   setDeckTitle: (title: string) => void
+  setSaveState: (saveState: SaveState) => void
+  setDeckIndex: (deckIndex: DeckIndexEntry[]) => void
 
   // --- selection ---
   selectSlide: (id: string | null) => void
@@ -106,6 +123,9 @@ const INITIAL_DECK: Deck = createDefaultDeck()
 
 export const useEditor = create<EditorState>((set, get) => ({
   deck: INITIAL_DECK,
+  deckId: '',
+  saveState: 'saving',
+  deckIndex: [],
   selectedSlideId: INITIAL_DECK.slides[0]?.id ?? null,
   selectedShapeIds: [],
   zoom: 100,
@@ -154,17 +174,29 @@ export const useEditor = create<EditorState>((set, get) => ({
     })
   },
 
+  hydrateDeck: (id, deck, fileName) => {
+    set({
+      deckId: id,
+      deck,
+      selectedSlideId: deck.slides[0]?.id ?? null,
+      selectedShapeIds: [],
+      past: [],
+      future: [],
+      loadedFileName: fileName ?? null,
+      zoom: 100,
+    })
+  },
+
   newDeck: () => {
-    const d = createDefaultDeck()
-    set({ deck: d, selectedSlideId: null, selectedShapeIds: [], past: [], future: [], loadedFileName: null })
-    get().selectSlide(d.slides[0]?.id ?? null)
+    get().hydrateDeck(nanoid(), createDefaultDeck())
   },
 
   loadDeck: (deck, fileName) => {
-    set({ deck, selectedSlideId: null, selectedShapeIds: [], past: [], future: [], loadedFileName: fileName ?? null })
-    get().selectSlide(deck.slides[0]?.id ?? null)
-    get().setZoom(100)
+    get().hydrateDeck(nanoid(), deck, fileName)
   },
+
+  setSaveState: (saveState) => set({ saveState }),
+  setDeckIndex: (deckIndex) => set({ deckIndex }),
 
   setSlideSize: (w, h) => {
     get().commit((d) => {
