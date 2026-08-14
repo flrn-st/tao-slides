@@ -18,6 +18,14 @@ export class BridgeError extends Error {
   }
 }
 
+function isMissingValue(err: unknown): boolean {
+  if (err instanceof BridgeError) {
+    if (err.code === 'not_found' || err.code === 'timeout') return true
+    if (/not found|404/i.test(err.message)) return true
+  }
+  return /not found|404/i.test(err instanceof Error ? err.message : String(err))
+}
+
 export const embedded = typeof window !== 'undefined' && window.parent !== window
 
 type Pending = {
@@ -157,7 +165,7 @@ const bridgeStorage: KvStorage = {
     try {
       return await storageGet(key)
     } catch (err) {
-      if (err instanceof BridgeError && (err.code === 'not_found' || err.code === 'timeout')) return null
+      if (isMissingValue(err)) return null
       throw err
     }
   },

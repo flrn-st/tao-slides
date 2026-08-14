@@ -24,8 +24,7 @@ function deckKey(id: string): string {
 
 function isTooLarge(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
-  const code = err instanceof BridgeError ? err.code : ''
-  return /32\s*MB|too large|values are limited/i.test(msg) || code === 'invalid'
+  return /32\s*MB|too large|values are limited/i.test(msg)
 }
 
 function isQuota(err: unknown): boolean {
@@ -33,14 +32,44 @@ function isQuota(err: unknown): boolean {
 }
 
 async function readIndex(): Promise<DeckIndexEntry[]> {
-  const raw = await storage.get(INDEX_KEY)
-  if (!raw) return []
   try {
-    const parsed = JSON.parse(raw) as unknown
-    return Array.isArray(parsed) ? (parsed as DeckIndexEntry[]) : []
+    const raw = await storage.get(INDEX_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as DeckIndexEntry[]
+    }
   } catch {
-    return []
+    // Fall through and rebuild from stored deck records.
   }
+  return rebuildIndex()
+}
+
+async function rebuildIndex(): Promise<DeckIndexEntry[]> {
+  const items = await storage.list()
+  const entries: DeckIndexEntry[] = []
+  for (const item of items) {
+    if (!item.key.startsWith(DECK_PREFIX) || item.key === INDEX_KEY) continue
+    const id = item.key.slice(DECK_PREFIX.length)
+    if (!id) continue
+    const deck = await getDeck(id)
+    if (!deck) continue
+    const updatedAt = item.updatedAt > 1_000_000_000_000 ? item.updatedAt : item.updatedAt * 1000
+    entries.push({
+      id,
+      title: deck.title || 'Untitled',
+      slideCount: deck.slides.length,
+      updatedAt: updatedAt || Date.now(),
+    })
+  }
+  entries.sort((a, b) => b.updatedAt - a.updatedAt)
+  if (entries.length > 0) {
+    try {
+      await writeIndex(entries)
+    } catch (err) {
+      console.warn('could not persist rebuilt deck index', err)
+    }
+  }
+  return entries
 }
 
 async function writeIndex(entries: DeckIndexEntry[]): Promise<void> {
@@ -90,7 +119,13 @@ export async function saveNow(): Promise<void> {
   const run = (async () => {
     try {
       await putDeck(deckId, deck)
-      const index = upsertIndex(await readIndex(), {
+      let prev: DeckIndexEntry[] = []
+      try {
+        prev = await readIndex()
+      } catch (err) {
+        console.warn('deck index unreadable; rewriting', err)
+      }
+      const index = upsertIndex(prev, {
         id: deckId,
         title: deck.title || 'Untitled',
         slideCount: deck.slides.length,

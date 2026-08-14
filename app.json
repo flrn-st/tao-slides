@@ -1,7 +1,7 @@
 {
   "id": "slides",
   "name": "Slides",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Create, edit and present slide decks. Imports and exports PowerPoint (.pptx) files.",
   "icon": "presentation",
   "ui": "ui/index.html",
