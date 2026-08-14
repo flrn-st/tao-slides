@@ -191,10 +191,11 @@ export async function bootPersistence(): Promise<void> {
     const index = await readIndex()
     useEditor.getState().setDeckIndex(index)
     if (index.length > 0) {
-      const latest = [...index].sort((a, b) => b.updatedAt - a.updatedAt)[0]
-      const deck = await getDeck(latest.id)
-      if (deck) {
-        useEditor.getState().hydrateDeck(latest.id, deck)
+      const sorted = [...index].sort((a, b) => b.updatedAt - a.updatedAt)
+      for (const entry of sorted) {
+        const deck = await getDeck(entry.id)
+        if (!deck) continue
+        useEditor.getState().hydrateDeck(entry.id, deck)
         setSavedIdle()
         booted = true
         subscribeAutosave()
